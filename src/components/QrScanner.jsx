@@ -74,14 +74,14 @@ export default function QrScanner({ onScan, label = 'Scan', size = 240 }) {
   return (
     <div className="qr">
       {!open ? (
-        <button className="btn btn-secondary" onClick={startScanner} disabled={busy}>
+        <button type="button" className="btn btn-secondary" onClick={startScanner} disabled={busy}>
           {busy ? 'Opening…' : label}
         </button>
       ) : (
         <div className="scanner">
           <div id={containerIdRef.current} className="scanner-box" />
           <div className="row">
-            <button className="btn" onClick={stopScanner}>Close</button>
+            <button type="button" className="btn" onClick={stopScanner}>Close</button>
           </div>
           {error && <div className="error" role="alert">{error}</div>}
         </div>
