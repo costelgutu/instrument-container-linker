@@ -1,89 +1,67 @@
 import { useEffect, useRef, useState } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+import { Html5QrcodeScanner } from 'html5-qrcode'
 
-export default function QrScanner({ onScan, label = 'Scan', size = 240 }) {
+export default function QrScanner({
+  onScan,
+  label = 'Scan',
+  qrbox = 240,
+  fps = 10,
+  aspectRatio = 1.0,
+  disableFlip = false,
+}) {
   const [open, setOpen] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const containerIdRef = useRef(`qr-${Math.random().toString(36).slice(2)}`)
-  const qrRef = useRef(null)
+  const regionIdRef = useRef(`html5qr-${Math.random().toString(36).slice(2)}`)
+  const scannerRef = useRef(null)
 
   useEffect(() => {
-    // Cleanup on unmount
-    return () => stopScanner()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!open) return
 
-  const startScanner = async () => {
-    if (busy) return
-    setError('')
-    setOpen(true)
-    setBusy(true)
-    try {
-      if (!qrRef.current) {
-        qrRef.current = new Html5Qrcode(containerIdRef.current, /* verbose */ false)
-      }
-      await qrRef.current.start(
-        { facingMode: { exact: 'environment' } }, // prefer rear camera
-        {
-          fps: 10,
-          qrbox: { width: size, height: size },
-          rememberLastUsedCamera: true,
-          aspectRatio: 1.0,
-        },
-        onScanSuccess,
-        onScanError
-      )
-    } catch (e) {
-      // fallback: try default facingMode if exact env not available
-      try {
-        await qrRef.current.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: size, height: size } },
-          onScanSuccess,
-          onScanError
-        )
-      } catch (err) {
-        setError(err?.message || 'Unable to start camera')
+    const config = {
+      fps,
+      qrbox,
+      aspectRatio,
+      disableFlip,
+      rememberLastUsedCamera: true,
+    }
+
+    scannerRef.current = new Html5QrcodeScanner(regionIdRef.current, config, /* verbose */ false)
+
+    scannerRef.current.render(
+      (decodedText /*, decodedResult */) => {
+        onScan(decodedText.trim())
+        // Close after a successful scan
         setOpen(false)
+      },
+      /* onScanError: ignore per-frame decode errors */
+      () => {}
+    )
+
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {})
+        scannerRef.current = null
       }
-    } finally {
-      setBusy(false)
     }
-  }
-
-  const stopScanner = async () => {
-    if (qrRef.current && qrRef.current.isScanning) {
-      try {
-        await qrRef.current.stop()
-        await qrRef.current.clear()
-      } catch {}
-    }
-    setOpen(false)
-  }
-
-  const onScanSuccess = async (decodedText) => {
-    onScan(decodedText)
-    await stopScanner()
-  }
-
-  const onScanError = () => {
-    // ignore per-frame decode errors to avoid noisy UI
-  }
+  }, [open, fps, qrbox, aspectRatio, disableFlip, onScan])
 
   return (
     <div className="qr">
       {!open ? (
-        <button type="button" className="btn btn-secondary" onClick={startScanner} disabled={busy}>
-          {busy ? 'Opening…' : label}
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setOpen(true)}
+        >
+          {label}
         </button>
       ) : (
         <div className="scanner">
-          <div id={containerIdRef.current} className="scanner-box" />
+          <div id={regionIdRef.current} className="scanner-box" />
           <div className="row">
-            <button type="button" className="btn" onClick={stopScanner}>Close</button>
+            <button type="button" className="btn" onClick={() => setOpen(false)}>
+              Close
+            </button>
           </div>
-          {error && <div className="error" role="alert">{error}</div>}
         </div>
       )}
     </div>
